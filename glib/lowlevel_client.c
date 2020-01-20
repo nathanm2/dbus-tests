@@ -83,6 +83,13 @@ static GOptionContext *common_option_context(const char *parameter_string,
     return opt_ctx;
 }
 
+static void show_help(GOptionContext *opt_ctx)
+{
+    char *help_str = g_option_context_get_help(opt_ctx, false, NULL);
+    fwrite(help_str, 1, strlen(help_str), stdout);
+    g_free(help_str);
+}
+
 static bool parse_options(GOptionContext *opt_ctx, int *argc, char ***argv,
                           int *status)
 {
@@ -114,6 +121,7 @@ static int do_echo(int argc, char **argv)
     GError *gerror = NULL;
     GDBusConnection *connection = NULL;
     GVariant *reply = NULL;
+    char *reply_str = NULL;
 
     opt_ctx = common_option_context(echo_parameters, echo_summary, false);
     if (!parse_options(opt_ctx, &argc, &argv, &rc))
@@ -136,8 +144,73 @@ static int do_echo(int argc, char **argv)
     reply = g_dbus_connection_call_sync(
         connection, "com.wdc.TestService1", "/com/wdc/TestService1",
         "com.wdc.TestService1", "EchoString", g_variant_new("(s)", argv[1]),
-        "(s)", G_DBUS_CALL_FLAGS_NONE, -1, NULL, &gerror);
+        G_VARIANT_TYPE("(s)"), G_DBUS_CALL_FLAGS_NONE, -1, NULL, &gerror);
     if (!reply) {
+        print_gerror(gerror);
+        goto cleanup;
+    }
+
+    g_variant_get(reply, "(s)", &reply_str);
+    printf("%s\n", reply_str);
+    rc = 0;
+
+cleanup:
+
+    g_option_context_free(opt_ctx);
+    if (connection)
+        g_object_unref(connection);
+    if (gerror)
+        g_error_free(gerror);
+    if (reply)
+        g_variant_unref(reply);
+    if (reply_str)
+        g_free(reply_str);
+    return rc;
+}
+
+/* Wait Command */
+
+static const char *wait_parameters = "wait [SECONDS]";
+static const char *wait_summary = "Block in a method for SECONDS.";
+
+static int do_wait(int argc, char **argv)
+{
+    GOptionContext *opt_ctx;
+    int rc = -1;
+    GError *gerror = NULL;
+    GDBusConnection *connection = NULL;
+    char *endptr = NULL;
+    int64_t wait;
+
+    opt_ctx = common_option_context(wait_parameters, wait_summary, false);
+    if (!parse_options(opt_ctx, &argc, &argv, &rc))
+        goto cleanup;
+
+    if (argc < 2) {
+        print_error("SECONDS argument required.");
+        goto cleanup;
+    } else if (argc > 2) {
+        print_error("too many arguments.");
+        goto cleanup;
+    }
+
+    wait = g_ascii_strtoll(argv[1], &endptr, 0);
+    if (*endptr != '\0') {
+        print_error("cannot convert %s to integer.", argv[1]);
+        goto cleanup;
+    }
+
+    connection = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &gerror);
+    if (!connection) {
+        print_gerror(gerror);
+        goto cleanup;
+    }
+
+    g_dbus_connection_call_sync(connection, "com.wdc.TestService1",
+                                "/com/wdc/TestService1", "com.wdc.TestService1",
+                                "Wait", g_variant_new("(t)", wait), NULL,
+                                G_DBUS_CALL_FLAGS_NONE, -1, NULL, &gerror);
+    if (gerror) {
         print_gerror(gerror);
         goto cleanup;
     }
@@ -151,14 +224,7 @@ cleanup:
         g_object_unref(connection);
     if (gerror)
         g_error_free(gerror);
-    if (reply)
-        g_variant_unref(reply);
     return rc;
-}
-
-static int do_wait(int argc, char **argv)
-{
-    return 0;
 }
 
 int main(int argc, char **argv)
@@ -169,6 +235,11 @@ int main(int argc, char **argv)
     opt_ctx = common_option_context(common_parameters, common_summary, true);
 
     if (!parse_options(opt_ctx, &argc, &argv, &rc)) {
+        goto cleanup;
+    }
+
+    if (argc <= 1) {
+        show_help(opt_ctx);
         goto cleanup;
     }
 
