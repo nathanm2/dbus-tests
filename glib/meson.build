@@ -1,3 +1,4 @@
-project('tutorial', 'c')
+project('glib-dbus', 'c')
 glib = dependency('glib-2.0')
-executable('demo', 'main.c', dependencies: glib)
+gio = dependency('gio-2.0')
+executable('client', 'client.c', dependencies: [glib, gio])
