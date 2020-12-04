@@ -28,6 +28,24 @@ def listen_signal(service, args):
     loop = GLib.MainLoop()
     loop.run()
 
+from pydbus.proxy_property import ProxyProperty
+
+def config(service, args):
+    klass = type(service)
+    props = [attr for attr in dir(klass) if isinstance(getattr(klass, attr), ProxyProperty)]
+    args_len = len(args.args)
+
+    if args_len == 0:
+        for prop in props:
+            print("{} = {}".format(prop, getattr(service, prop)))
+    elif args_len == 1:
+        key = args.args[0]
+        print("{} = {}".format(key, getattr(service, key)))
+    elif args_len == 2:
+        key = args.args[0]
+        val = type(getattr(service, key))(args.args[1])
+        setattr(service, key, val)
+
 def main():
     parser = argparse.ArgumentParser(description="test service client")
     sub = parser.add_subparsers(title='subcommands', dest='subcommand')
@@ -53,6 +71,10 @@ def main():
     listen_parser.add_argument("--name", "-n", help="Signal name")
     listen_parser.add_argument("--value", "-v", help="Signal value")
     listen_parser.set_defaults(func=listen_signal)
+
+    config_parser = sub.add_parser("config", help="configures properties")
+    config_parser.add_argument('args', nargs='*')
+    config_parser.set_defaults(func=config)
 
     args = parser.parse_args()
 

@@ -44,9 +44,42 @@ class TestService():
           <arg name="value1" type="s"/>
         </signal>
 
+        <property name="StrProp" type="s" access="readwrite"/>
+        <property name="IntProp" type="i" access="readwrite"/>
+        <property name="BoolProp" type="b" access="readwrite"/>
+
       </interface>
     </node>
    """
+    def __init__(self):
+        self._str_prop = ""
+        self._int_prop = 0
+        self._bool_prop = False
+
+    @property
+    def StrProp(self):
+        return self._str_prop
+
+    @StrProp.setter
+    def StrProp(self, value):
+        self._str_prop = value
+
+    @property
+    def IntProp(self):
+        return self._int_prop
+
+    @IntProp.setter
+    def IntProp(self, value):
+        self._int_prop = value
+
+    @property
+    def BoolProp(self):
+        return self._bool_prop
+
+    @BoolProp.setter
+    def BoolProp(self, value):
+        self._bool_prop = value
+
     def EchoString(self, string):
         print("EchoString: {}".format(string))
         return string
